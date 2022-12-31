@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer')
 const { BrowserFetcher } = require('puppeteer-core')
 
 let deptlinks = [];
-let courselinks = [];
+
 
 /*
  steps of the web scraping:
@@ -14,37 +14,8 @@ let courselinks = [];
      - idk how to handle this, will consider later
 
 how to represent this as a csv:
- - adjacency-matrix-esque setup map[dept name (represented by index maybe)][course #] 
- - dept name has a corresponding map<string, int> giving index
- - course # has a corresponding map<int, index> giving index
- - entry will have False if dne, else will have either a sub-division of some form of requirements or a list of availabilities
+ - each row is a course section with its name, start, end, Prereqs, Coreqs, and type
 */
-
-
-async function visitLink(page, link) {
-
-    // create new browser ?
-    
-
-    await page.goto(link);
-
-    let coursedata = await page.evaluate(() => {
-        // scrape department courses
-        let courses = document.querySelectorAll("#mainTable > tbody > tr");
-        
-
-        courses.forEach((course) => {
-            let c = $($(course).children().first()).children().first().attr("href")
-            if (c) {
-                courselinks.push(c)
-            }
-        })
-
-        return courselinks;
-    })
-
-    console.log(coursedata);
-}
 
 
 // immediately executes this code
@@ -76,6 +47,8 @@ void (async () => {
                 let i = $($(item).children().first()).children().first().attr('href')
                 if (i) {
                     deptlinks.push(i);
+
+                    
                 }
             })
 
@@ -84,23 +57,80 @@ void (async () => {
 
         console.log(deptdata);
 
-        let newPage = await browser.newPage();
+        const newPage = await browser.newPage();
 
-        deptdata.forEach ((i) => {
-            let link = "https://courses.students.ubc.ca" + i;
+        let crs = [''];
 
-            visitLink(newPage, link).then(
-                function(value) {console.log(courselinks);},
-                function(error) {console.log(error);}
-            );
-        })
+        for (const link of deptdata) {
+
+            let url = "https://courses.students.ubc.ca" + link;
+
+            await newPage.goto(url);
+
+            const contents = await newPage.evaluate(() => {
+                let courselinks = [];
+                // scrape department courses
+                let courses = document.querySelectorAll("#mainTable > tbody > tr");
+                courses.forEach((course) => {
+                    let c = $($(course).children().first()).children().first().attr("href")
+                    if (c) {
+                        courselinks.push(c)
+                    }
+                })
+
+                return courselinks;
+            });
+
+            crs.push(contents);
+
+            
+        }
+
+        console.log(crs);
 
 
+        // get course section data
+        
+
+        const thirdPage = await browser.newPage();
+
+        let sects = [];
+
+        for (const course of crs) {
+            for (const link of course) {
+                let url = "https://courses.students.ubc.ca" + link;
+
+                await thirdPage.goto(url);
+
+                const contents = await thirdPage.evaluate(() => {
+                    let sectionlinks = [];
+
+                    let sections = document.querySelectorAll("body > div.container > div.content.expand > table.table.table-striped.section-summary > tbody > tr");
+
+                    sections.forEach((section) => {
+                        let s = $($(section).children().first().next()).children().first().attr('href');
+        
+                        if (s) {
+                            sectionlinks.push(s)
+                        }
+                    })
+                    
+
+                    return sectionlinks;
+                })
+
+                sects.push(contents)
+            }
+            
+        } 
+
+        console.log(sects);
+
+        
+        
         await browser.close()
         
     } catch (error) {
         console.log(error)
     }
 })()
-
-
