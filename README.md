@@ -1,4 +1,4 @@
-# course-webscrape
+# UBC course webscraper
 Node.js Puppeteer web scraper built for the ubc course listing website
 
 Currently: saves data to a json file
